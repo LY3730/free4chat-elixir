@@ -89,8 +89,7 @@ args =
   if protocol == :https do
     [
       keyfile: get_env.("KEY_FILE_PATH", "priv/certs/key.pem"),
-      certfile: get_env.("CERT_FILE_PATH", "priv/certs/certificate.pem"),
-      cipher_suite: :strong
+      certfile: get_env.("CERT_FILE_PATH", "priv/certs/certificate.pem")
     ]
   else
     []
@@ -100,7 +99,8 @@ args =
 config :free4chat, Free4chatWeb.Endpoint, [
   {:url, [host: host]},
   {protocol, args},
-  check_origin: (host == "localhost" && false) || ["//#{host}"]
+  # Allow backend host + all origins when using IP (for self-signed cert scenarios)
+  check_origin: (host == "localhost" && false) || (host_is_ip && false) || ["//#{host}"]
 ]
 
 # config/runtime.exs is executed for all environments, including
@@ -183,8 +183,9 @@ if otel_state != :purge,
       ]
     )
 
-# Only configure clustering for non-localhost environments
-if host != "localhost" do
+# Only configure clustering for valid domain hostnames (not localhost, not IP addresses)
+host_is_ip = Regex.match?(~r/^\d+\.\d+\.\d+\.\d+$/, host)
+if host != "localhost" and not host_is_ip do
   config :libcluster,
     debug: true,
     topologies: [
